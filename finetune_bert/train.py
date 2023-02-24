@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 
 # Read data
 TRAIN_CSV_FILE = "/media/ryuu/ryuu2/dev/bert_custom/train_drug.csv"
-df = pd.read_csv(TRAIN_CSV_FILE, on_bad_lines='skip')
+df = pd.read_csv(TRAIN_CSV_FILE, on_bad_lines="skip")
 
 # Define pretrained tokenizer and model
 model_name = "bert-base-uncased"
@@ -25,21 +25,25 @@ model_name = "bert-base-uncased"
 
 X = list(df["comment_text"])
 y = list(df["label"])
-X_train, X_val, y_train, y_val = train_test_split(X, y, random_state=69,shuffle=True, test_size=0.25)
+X_train, X_val, y_train, y_val = train_test_split(
+    X, y, random_state=69, shuffle=True, test_size=0.25
+)
 
-if torch.cuda.is_available():       
+if torch.cuda.is_available():
     device = torch.device("cuda")
-    print(f'There are {torch.cuda.device_count()} GPU(s) available.')
-    print('Device name:', torch.cuda.get_device_name(0))
+    print(f"There are {torch.cuda.device_count()} GPU(s) available.")
+    print("Device name:", torch.cuda.get_device_name(0))
 
 else:
-    print('No GPU available, using the CPU instead.')
+    print("No GPU available, using the CPU instead.")
     device = torch.device("cpu")
-    
+
 import nltk
+
 # Uncomment to download "stopwords"
 nltk.download("stopwords")
 from nltk.corpus import stopwords
+
 
 def text_preprocessing(s):
     """
@@ -55,20 +59,25 @@ def text_preprocessing(s):
     # Change 't to 'not'
     s = re.sub(r"\'t", " not", s)
     # Remove @name
-    s = re.sub(r'(@.*?)[\s]', ' ', s)
+    s = re.sub(r"(@.*?)[\s]", " ", s)
     # Isolate and remove punctuations except '?'
-    s = re.sub(r'([\'\"\.\(\)\!\?\\\/\,])', r' \1 ', s)
-    s = re.sub(r'[^\w\s\?]', ' ', s)
+    s = re.sub(r"([\'\"\.\(\)\!\?\\\/\,])", r" \1 ", s)
+    s = re.sub(r"[^\w\s\?]", " ", s)
     # Remove some special characters
-    s = re.sub(r'([\;\:\|•«\n])', ' ', s)
+    s = re.sub(r"([\;\:\|•«\n])", " ", s)
     # Remove stopwords except 'not' and 'can'
-    s = " ".join([word for word in s.split()
-                  if word not in stopwords.words('english')
-                  or word in ['not', 'can']])
+    s = " ".join(
+        [
+            word
+            for word in s.split()
+            if word not in stopwords.words("english") or word in ["not", "can"]
+        ]
+    )
     # Remove trailing whitespace
-    s = re.sub(r'\s+', ' ', s).strip()
-    
+    s = re.sub(r"\s+", " ", s).strip()
+
     return s
+
 
 # TF-IDF Vectorizer
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -78,9 +87,7 @@ X_train_preprocessed = np.array([text_preprocessing(text) for text in X_train])
 X_val_preprocessed = np.array([text_preprocessing(text) for text in X_val])
 
 # Calculate TF-IDF
-tf_idf = TfidfVectorizer(ngram_range=(1, 3),
-                         binary=True,
-                         smooth_idf=False)
+tf_idf = TfidfVectorizer(ngram_range=(1, 3), binary=True, smooth_idf=False)
 X_train_tfidf = tf_idf.fit_transform(X_train_preprocessed)
 X_val_tfidf = tf_idf.transform(X_val_preprocessed)
 
@@ -93,24 +100,25 @@ def text_preprocessing(text):
     @return   text (Str): the processed string.
     """
     # Remove '@name'
-    text = re.sub(r'(@.*?)[\s]', ' ', text)
+    text = re.sub(r"(@.*?)[\s]", " ", text)
 
     # Replace '&amp;' with '&'
-    text = re.sub(r'&amp;', '&', text)
+    text = re.sub(r"&amp;", "&", text)
 
     # Remove trailing whitespace
-    text = re.sub(r'\s+', ' ', text).strip()
+    text = re.sub(r"\s+", " ", text).strip()
 
     return text
 
+
 # Print sentence 0
-print('Original: ', X[100])
-print('Processed: ', text_preprocessing(X[100]))
+print("Original: ", X[100])
+print("Processed: ", text_preprocessing(X[100]))
 
 from transformers import BertTokenizer
 
 # Load the BERT tokenizer
-tokenizer = BertTokenizer.from_pretrained('bert-base-uncased', do_lower_case=True)
+tokenizer = BertTokenizer.from_pretrained("bert-base-uncased", do_lower_case=True)
 
 # Create a function to tokenize a set of texts
 def preprocessing_for_bert(data):
@@ -128,18 +136,18 @@ def preprocessing_for_bert(data):
     for sent in data:
         encoded_sent = tokenizer.encode_plus(
             text=text_preprocessing(sent),  # Preprocess sentence
-            add_special_tokens=True,        # Add `[CLS]` and `[SEP]`
+            add_special_tokens=True,  # Add `[CLS]` and `[SEP]`
             max_length=512,
-            pad_to_max_length=True,         # Pad sentence to max length
+            pad_to_max_length=True,  # Pad sentence to max length
             # padding=True,
             # truncation=True,
             # return_tensors='pt',           # Return PyTorch tensor
-            return_attention_mask=True      # Return attention mask
-            )
-        
+            return_attention_mask=True,  # Return attention mask
+        )
+
         # Add the outputs to the lists
-        input_ids.append(encoded_sent.get('input_ids'))
-        attention_masks.append(encoded_sent.get('attention_mask'))
+        input_ids.append(encoded_sent.get("input_ids"))
+        attention_masks.append(encoded_sent.get("attention_mask"))
 
     # Convert lists to tensors
     input_ids = torch.tensor(input_ids)
@@ -149,11 +157,11 @@ def preprocessing_for_bert(data):
 
 
 token_ids = list(preprocessing_for_bert([X[0]])[0].squeeze().numpy())
-print('Original: ', X[0])
-print('Token IDs: ', token_ids)
+print("Original: ", X[0])
+print("Token IDs: ", token_ids)
 
 # Run function `preprocessing_for_bert` on the train set and the validation set
-print('Tokenizing data...')
+print("Tokenizing data...")
 train_inputs, train_masks = preprocessing_for_bert(X_train)
 val_inputs, val_masks = preprocessing_for_bert(X_val)
 
@@ -183,8 +191,8 @@ from transformers import BertModel
 
 # Create the BertClassfier class
 class BertClassifier(nn.Module):
-    """Bert Model for Classification Tasks.
-    """
+    """Bert Model for Classification Tasks."""
+
     def __init__(self, freeze_bert=False):
         """
         @param    bert: a BertModel object
@@ -196,21 +204,21 @@ class BertClassifier(nn.Module):
         D_in, H, D_out = 768, 50, 2
 
         # Instantiate BERT model
-        self.bert = BertModel.from_pretrained('bert-base-uncased')
+        self.bert = BertModel.from_pretrained("bert-base-uncased")
 
         # Instantiate an one-layer feed-forward classifier
         self.classifier = nn.Sequential(
             nn.Linear(D_in, H),
             nn.ReLU(),
-            #nn.Dropout(0.5),
-            nn.Linear(H, D_out)
+            # nn.Dropout(0.5),
+            nn.Linear(H, D_out),
         )
 
         # Freeze the BERT model
         if freeze_bert:
             for param in self.bert.parameters():
                 param.requires_grad = False
-        
+
     def forward(self, input_ids, attention_mask):
         """
         Feed input to BERT and the classifier to compute logits.
@@ -222,9 +230,8 @@ class BertClassifier(nn.Module):
                       num_labels)
         """
         # Feed input to BERT
-        outputs = self.bert(input_ids=input_ids,
-                            attention_mask=attention_mask)
-        
+        outputs = self.bert(input_ids=input_ids, attention_mask=attention_mask)
+
         # Extract the last hidden state of the token `[CLS]` for classification task
         last_hidden_state_cls = outputs[0][:, 0, :]
 
@@ -233,11 +240,12 @@ class BertClassifier(nn.Module):
 
         return logits
 
+
 from transformers import AdamW, get_linear_schedule_with_warmup
 
+
 def initialize_model(epochs=4):
-    """Initialize the Bert Classifier, the optimizer and the learning rate scheduler.
-    """
+    """Initialize the Bert Classifier, the optimizer and the learning rate scheduler."""
     # Instantiate Bert Classifier
     bert_classifier = BertClassifier(freeze_bert=False)
 
@@ -245,38 +253,40 @@ def initialize_model(epochs=4):
     bert_classifier.to(device)
 
     # Create the optimizer
-    optimizer = AdamW(bert_classifier.parameters(),
-                      lr=5e-5,    # Default learning rate
-                      eps=1e-8    # Default epsilon value
-                      )
+    optimizer = AdamW(
+        bert_classifier.parameters(),
+        lr=5e-5,  # Default learning rate
+        eps=1e-8,  # Default epsilon value
+    )
 
     # Total number of training steps
     total_steps = len(train_dataloader) * epochs
 
     # Set up the learning rate scheduler
-    scheduler = get_linear_schedule_with_warmup(optimizer,
-                                                num_warmup_steps=0, # Default value
-                                                num_training_steps=total_steps)
+    scheduler = get_linear_schedule_with_warmup(
+        optimizer, num_warmup_steps=0, num_training_steps=total_steps  # Default value
+    )
     return bert_classifier, optimizer, scheduler
 
-# Training Loop 
+
+# Training Loop
 import random
 import time
 
 # Specify loss function
 loss_fn = nn.CrossEntropyLoss()
 
+
 def set_seed(seed_value=42):
-    """Set seed for reproducibility.
-    """
+    """Set seed for reproducibility."""
     random.seed(seed_value)
     np.random.seed(seed_value)
     torch.manual_seed(seed_value)
     torch.cuda.manual_seed_all(seed_value)
 
+
 def train(model, train_dataloader, val_dataloader=None, epochs=4, evaluation=False):
-    """Train the BertClassifier model.
-    """
+    """Train the BertClassifier model."""
     # Start training loop
     print("Start training...\n")
     for epoch_i in range(epochs):
@@ -284,8 +294,10 @@ def train(model, train_dataloader, val_dataloader=None, epochs=4, evaluation=Fal
         #               Training
         # =======================================
         # Print the header of the result table
-        print(f"{'Epoch':^7} | {'Batch':^7} | {'Train Loss':^12} | {'Val Loss':^10} | {'Val Acc':^9} | {'Elapsed':^9}")
-        print("-"*70)
+        print(
+            f"{'Epoch':^7} | {'Batch':^7} | {'Train Loss':^12} | {'Val Loss':^10} | {'Val Acc':^9} | {'Elapsed':^9}"
+        )
+        print("-" * 70)
 
         # Measure the elapsed time of each epoch
         t0_epoch, t0_batch = time.time(), time.time()
@@ -298,7 +310,7 @@ def train(model, train_dataloader, val_dataloader=None, epochs=4, evaluation=Fal
 
         # For each batch of training data...
         for step, batch in enumerate(train_dataloader):
-            batch_counts +=1
+            batch_counts += 1
             # Load batch to GPU
             b_input_ids, b_attn_mask, b_labels = tuple(t.to(device) for t in batch)
 
@@ -329,7 +341,9 @@ def train(model, train_dataloader, val_dataloader=None, epochs=4, evaluation=Fal
                 time_elapsed = time.time() - t0_batch
 
                 # Print training results
-                print(f"{epoch_i + 1:^7} | {step:^7} | {batch_loss / batch_counts:^12.6f} | {'-':^10} | {'-':^9} | {time_elapsed:^9.2f}")
+                print(
+                    f"{epoch_i + 1:^7} | {step:^7} | {batch_loss / batch_counts:^12.6f} | {'-':^10} | {'-':^9} | {time_elapsed:^9.2f}"
+                )
 
                 # Reset batch tracking variables
                 batch_loss, batch_counts = 0, 0
@@ -338,7 +352,7 @@ def train(model, train_dataloader, val_dataloader=None, epochs=4, evaluation=Fal
         # Calculate the average loss over the entire training data
         avg_train_loss = total_loss / len(train_dataloader)
 
-        print("-"*70)
+        print("-" * 70)
         # =======================================
         #               Evaluation
         # =======================================
@@ -349,11 +363,13 @@ def train(model, train_dataloader, val_dataloader=None, epochs=4, evaluation=Fal
 
             # Print performance over the entire training data
             time_elapsed = time.time() - t0_epoch
-            
-            print(f"{epoch_i + 1:^7} | {'-':^7} | {avg_train_loss:^12.6f} | {val_loss:^10.6f} | {val_accuracy:^9.2f} | {time_elapsed:^9.2f}")
-            print("-"*70)
+
+            print(
+                f"{epoch_i + 1:^7} | {'-':^7} | {avg_train_loss:^12.6f} | {val_loss:^10.6f} | {val_accuracy:^9.2f} | {time_elapsed:^9.2f}"
+            )
+            print("-" * 70)
         print("\n")
-    
+
     print("Training complete!")
 
 
@@ -396,7 +412,7 @@ def evaluate(model, val_dataloader):
     return val_loss, val_accuracy
 
 
-set_seed(69)    # Set seed for reproducibility
+set_seed(69)  # Set seed for reproducibility
 bert_classifier, optimizer, scheduler = initialize_model(epochs=4)
 train(bert_classifier, train_dataloader, val_dataloader, epochs=4, evaluation=True)
 
@@ -408,7 +424,9 @@ os.mkdir(save_path)
 
 # If we have a distributed model, save only the encapsulated model
 # (it was wrapped in PyTorch DistributedDataParallel or DataParallel)
-model_to_save = bert_classifier.module if hasattr(bert_classifier, 'module') else bert_classifier
+model_to_save = (
+    bert_classifier.module if hasattr(bert_classifier, "module") else bert_classifier
+)
 
 torch.save(bert_classifier.state_dict(), "finetuned-model/model_1_epochs.bin")
 print("-------------------ok done-------------------")
